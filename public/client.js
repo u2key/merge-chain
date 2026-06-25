@@ -65,7 +65,7 @@
   // ランキング取得・表示
   async function fetchLeaderboard(){
     try {
-      const res = await fetch('/api/leaderboard');
+      const res = await fetch('./api/leaderboard');
       const {leaderboard} = await res.json();
       leaderboardEl.innerHTML = leaderboard.map((p, i) => {
         return `<div class="leaderboard-item">
@@ -86,7 +86,7 @@
 
     try {
       // サーバーに登録
-      const res = await fetch('/api/player/register', {
+      const res = await fetch('./api/player/register', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({name, skin: currentSkin})
