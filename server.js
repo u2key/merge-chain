@@ -275,22 +275,51 @@ function tick(){
   if (foods.length < 40) spawnFood(30);
   if (foods.length > MAX_FOOD) foods = foods.slice(0, MAX_FOOD);
 
-  // マルチプレイ同期: 全クライアントに現在のスナップショットを送信する
-  // クライアントはこの state を受け取りレンダリングする
-  const snapshot = {
-    time: Date.now(),
-    snakes: Object.values(snakes).map(s => ({
-      id: s.id,
-      type: s.type,
-      name: s.name,
-      color: s.color,
-      head: {x: s.head.x, y: s.head.y},
-      segments: s.segments.map(p => ({x:p.x, y:p.y})),
-      alive: s.alive,
-    })),
-    foods: foods.map(f => ({id: f.id, x: f.x, y: f.y, r: f.r}))
-  };
-  io.sockets.emit('state', snapshot);
+  // マルチプレイ同期: 各プレイヤーに対して周囲オブジェクトのみを送信
+  // （ネットワーク最適化: 視野範囲外のスネーク・エサは送信しない）
+  // 視野範囲: プレイヤー周囲 600px（画面幅相当 + マージン）
+  const VIEW_RANGE = 600;
+  
+  for (const playerId in snakes) {
+    const playerSnake = snakes[playerId];
+    if (!playerSnake || playerSnake.type !== 'player') continue;
+    
+    // プレイヤーの周囲スネークをフィルタリング
+    const visibleSnakes = Object.values(snakes)
+      .filter(s => {
+        const dx = s.head.x - playerSnake.head.x;
+        const dy = s.head.y - playerSnake.head.y;
+        const distSq = dx*dx + dy*dy;
+        return distSq <= VIEW_RANGE * VIEW_RANGE;
+      })
+      .map(s => ({
+        id: s.id,
+        type: s.type,
+        name: s.name,
+        color: s.color,
+        head: {x: s.head.x, y: s.head.y},
+        segments: s.segments.map(p => ({x:p.x, y:p.y})),
+        alive: s.alive,
+      }));
+    
+    // プレイヤー周囲のエサをフィルタリング
+    const visibleFoods = foods.filter(f => {
+      const dx = f.x - playerSnake.head.x;
+      const dy = f.y - playerSnake.head.y;
+      const distSq = dx*dx + dy*dy;
+      return distSq <= VIEW_RANGE * VIEW_RANGE;
+    }).map(f => ({id: f.id, x: f.x, y: f.y, r: f.r}));
+    
+    // プレイヤー固有の state を送信
+    const snapshot = {
+      time: Date.now(),
+      snakes: visibleSnakes,
+      foods: visibleFoods
+    };
+    
+    // このプレイヤーのソケットのみに送信（broadcast ではなく個別送信）
+    io.to(playerSnake.socketId || playerId).emit('state', snapshot);
+  }
 }
 
 // REST API エンドポイント: ロビー画面用
@@ -363,6 +392,8 @@ io.on('connection', (socket) => {
     y: randRange(200, WORLD_H-200),
     len: 18
   });
+  // socketId をスネークに紐付け（tick() で周囲フィルタリング時に使用）
+  snakes[pid].socketId = socket.id;
   socket.data.snakeId = pid;
   socket.data.token = token;
   socket.emit('init', { id: pid, world: {w: WORLD_W, h: WORLD_H}, player: player });
