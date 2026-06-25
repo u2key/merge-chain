@@ -17,7 +17,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 25562;
 const PLAYERS_FILE = __dirname + '/data/players.json';
 
 app.use(express.static(__dirname + '/public'));
