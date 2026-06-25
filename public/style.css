@@ -1,0 +1,5 @@
+body { margin:0; font-family: Arial, Helvetica, sans-serif; background: #0b0c0d; color: #fff; }
+#scoreboard { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.45); padding: 8px 10px; border-radius: 6px; max-width: 260px; z-index: 10; }
+#game { display:block; margin: 0 auto; background:#080a0b; width:100%; height:100%; }
+.row { margin:3px 0; }
+.dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:6px; vertical-align:middle; }
