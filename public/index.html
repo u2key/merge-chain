@@ -7,9 +7,39 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="scoreboard"></div>
-  <canvas id="game" tabindex="0"></canvas>
+  <div id="app">
+    <!-- ロビー画面 -->
+    <div id="lobby" class="screen">
+      <h1>Merge-Chain</h1>
+      <div class="lobby-container">
+        <div class="left-panel">
+          <h2>プレイヤー設定</h2>
+          <div class="form-group">
+            <label>ユーザ名</label>
+            <input id="playerName" type="text" placeholder="Your nickname" maxlength="20" />
+          </div>
+          <div class="form-group">
+            <label>蛇の色</label>
+            <div id="skinPicker" class="skin-picker"></div>
+          </div>
+          <button id="playBtn" class="btn-play">プレイ</button>
+        </div>
+        <div class="right-panel">
+          <h2>ランキング</h2>
+          <div id="leaderboard" class="leaderboard"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ゲーム画面 -->
+    <div id="gameScreen" class="screen hidden">
+      <div id="scoreboard"></div>
+      <canvas id="game" tabindex="0"></canvas>
+    </div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="client.js"></script>
 </body>
 </html>
+

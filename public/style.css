@@ -1,5 +1,95 @@
 body { margin:0; font-family: Arial, Helvetica, sans-serif; background: #0b0c0d; color: #fff; }
+#app { width: 100%; height: 100%; }
+.screen { display: flex; flex-direction: column; width: 100%; height: 100vh; }
+.screen.hidden { display: none; }
+
+/* ロビー画面 */
+#lobby {
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+#lobby h1 { font-size: 2.5em; margin-bottom: 30px; }
+.lobby-container {
+  display: flex;
+  gap: 60px;
+  background: rgba(0,0,0,0.5);
+  padding: 40px;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  max-width: 900px;
+}
+.left-panel, .right-panel { flex: 1; }
+.left-panel h2, .right-panel h2 { margin-top: 0; margin-bottom: 15px; font-size: 1.3em; }
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; margin-bottom: 6px; font-weight: bold; }
+#playerName {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid #3498db;
+  background: #0b0c0d;
+  color: #fff;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+#playerName:focus { outline: none; border-color: #1abc9c; }
+
+.skin-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.skin-option {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: all 0.2s;
+}
+.skin-option:hover { transform: scale(1.1); }
+.skin-option.selected { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.5); }
+
+.btn-play {
+  width: 100%;
+  padding: 12px;
+  background: #1abc9c;
+  border: none;
+  color: #000;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+.btn-play:hover { background: #16a085; }
+
+.leaderboard {
+  background: rgba(50,50,50,0.5);
+  border-radius: 4px;
+  padding: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.leaderboard-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(100,100,100,0.2);
+  font-size: 13px;
+}
+.leaderboard-item:last-child { border-bottom: none; }
+.leaderboard-rank { font-weight: bold; margin-right: 8px; min-width: 30px; }
+.leaderboard-name { flex: 1; }
+.leaderboard-score { font-weight: bold; color: #1abc9c; }
+
+/* ゲーム画面 */
+#gameScreen {
+  position: relative;
+}
 #scoreboard { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.45); padding: 8px 10px; border-radius: 6px; max-width: 260px; z-index: 10; }
-#game { display:block; margin: 0 auto; background:#080a0b; width:100%; height:100%; }
+#game { display:block; width:100%; height:100%; background:#080a0b; }
 .row { margin:3px 0; }
 .dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+

@@ -3,18 +3,43 @@
   Node.js + socket.io サーバー
   - サーバーが全てのスネーク（プレイヤー + NPC）とエサを管理
   - 千切る判定と強奪あるいは即死処理はサーバーで行い、全クライアントへ同期する
+  - ロビー API: トークン認証、プレイヤー登録・更新、ランキング取得
+  - プレイヤーデータは players.json に永続化
 */
 
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const fs = require('fs');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
+const PLAYERS_FILE = __dirname + '/data/players.json';
+
 app.use(express.static(__dirname + '/public'));
+app.use(express.json());
+
+// データディレクトリが無ければ作成
+if (!fs.existsSync(__dirname + '/data')) {
+  fs.mkdirSync(__dirname + '/data', { recursive: true });
+}
+
+// プレイヤーデータ: { token -> {name, skin, maxScore, createdAt, updatedAt} }
+let playersDB = {};
+function loadPlayers(){
+  if (fs.existsSync(PLAYERS_FILE)){
+    try { playersDB = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8')); }
+    catch (e){ playersDB = {}; }
+  } else { playersDB = {}; }
+}
+function savePlayers(){
+  fs.writeFileSync(PLAYERS_FILE, JSON.stringify(playersDB, null, 2), 'utf8');
+}
+loadPlayers();
 
 // ワールド／ゲームパラメータ
 const WORLD_W = 2000;
@@ -268,15 +293,79 @@ function tick(){
   io.sockets.emit('state', snapshot);
 }
 
+// REST API エンドポイント: ロビー画面用
+
+// トークン認証ミドルウェア
+function authToken(req, res, next){
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token || !playersDB[token]) return res.status(401).json({error: 'Invalid token'});
+  req.token = token;
+  req.player = playersDB[token];
+  next();
+}
+
+// POST /api/player/register: 新規登録または既存トークンで即座にプレイを開始
+app.post('/api/player/register', (req,res) => {
+  const { name, skin } = req.body;
+  if (!name || typeof name !== 'string' || !skin) return res.status(400).json({error: 'Missing name or skin'});
+  const token = crypto.randomBytes(16).toString('hex');
+  const now = new Date().toISOString();
+  playersDB[token] = {
+    name: name.substring(0,20), // 最大20文字
+    skin: skin,
+    maxScore: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+  savePlayers();
+  res.json({ token, player: playersDB[token] });
+});
+
+// PUT /api/player/update: プレイヤー情報を更新（名前、スキン、最高スコア）
+app.put('/api/player/update', authToken, (req,res) => {
+  const { name, skin, maxScore } = req.body;
+  if (name) req.player.name = name.substring(0,20);
+  if (skin) req.player.skin = skin;
+  if (typeof maxScore === 'number') req.player.maxScore = Math.max(req.player.maxScore, maxScore);
+  req.player.updatedAt = new Date().toISOString();
+  savePlayers();
+  res.json({player: req.player});
+});
+
+// GET /api/leaderboard: トップ100プレイヤーのランキング
+app.get('/api/leaderboard', (req,res) => {
+  const list = Object.values(playersDB)
+    .sort((a,b) => b.maxScore - a.maxScore)
+    .slice(0, 100)
+    .map(p => ({name: p.name, maxScore: p.maxScore}));
+  res.json({leaderboard: list});
+});
+
+// GET /api/player: 現在のプレイヤー情報を取得
+app.get('/api/player', authToken, (req,res) => {
+  res.json({player: req.player});
+});
+
 // ソケット接続ハンドラ
 io.on('connection', (socket) => {
   console.log('client connected:', socket.id);
+  const token = socket.handshake.query.token;
+  let player = token && playersDB[token] ? playersDB[token] : null;
   const pid = 'player' + (nextSnakeId++);
-  const playerName = 'Player ' + pid;
-  const color = randomColor();
-  createSnake({id: pid, type: 'player', name: playerName, color, x: randRange(200, WORLD_W-200), y: randRange(200, WORLD_H-200), len: 18});
+  const playerName = player?.name || 'Player ' + pid;
+  const playerSkin = player?.skin || randomColor();
+  createSnake({
+    id: pid,
+    type: 'player',
+    name: playerName,
+    color: playerSkin,
+    x: randRange(200, WORLD_W-200),
+    y: randRange(200, WORLD_H-200),
+    len: 18
+  });
   socket.data.snakeId = pid;
-  socket.emit('init', { id: pid, world: {w: WORLD_W, h: WORLD_H} });
+  socket.data.token = token;
+  socket.emit('init', { id: pid, world: {w: WORLD_W, h: WORLD_H}, player: player });
 
   // クライアントからの入力（ワールド座標）を受け取り、サーバー側で移動ターゲットとして利用する
   socket.on('input', (data) => {
@@ -286,6 +375,16 @@ io.on('connection', (socket) => {
       s.target.x = clamp(data.x, 0, WORLD_W);
       s.target.y = clamp(data.y, 0, WORLD_H);
       s.lastSeen = Date.now();
+    }
+  });
+
+  // ゲーム終了時にスコアを報告（スコア = 蛇の体長）
+  socket.on('game-end', (data) => {
+    const token = socket.data.token;
+    if (token && playersDB[token] && typeof data.score === 'number'){
+      playersDB[token].maxScore = Math.max(playersDB[token].maxScore, data.score);
+      playersDB[token].updatedAt = new Date().toISOString();
+      savePlayers();
     }
   });
 
