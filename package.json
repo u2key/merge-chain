@@ -1,0 +1,13 @@
+{
+  "name": "merge-chain",
+  "version": "0.1.0",
+  "description": "Prototype multiplayer snake (merge/steal) with Node.js + socket.io",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  }
+}
