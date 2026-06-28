@@ -277,8 +277,8 @@ function tick(){
 
   // マルチプレイ同期: 各プレイヤーに対して周囲オブジェクトのみを送信
   // （ネットワーク最適化: 視野範囲外のスネーク・エサは送信しない）
-  // 視野範囲: プレイヤー周囲 600px（画面幅相当 + マージン）
-  const VIEW_RANGE = 600;
+  // 視野範囲: プレイヤー周囲 800px（画面幅相当 + マージン）
+  const VIEW_RANGE = 800;
   
   for (const playerId in snakes) {
     const playerSnake = snakes[playerId];
@@ -287,10 +287,18 @@ function tick(){
     // プレイヤーの周囲スネークをフィルタリング
     const visibleSnakes = Object.values(snakes)
       .filter(s => {
+        // プレイヤー自身は必ず表示
+        if (s.id === playerSnake.id) return true;
+        
         const dx = s.head.x - playerSnake.head.x;
         const dy = s.head.y - playerSnake.head.y;
-        const distSq = dx*dx + dy*dy;
-        return distSq <= VIEW_RANGE * VIEW_RANGE;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        
+        // スネークの胴体の長さを考慮した有効な視野範囲
+        // 頭が遠くても、胴体が長い場合は画面内に収まる可能性があるため
+        const effectiveViewRange = VIEW_RANGE + (s.segments.length * SEGMENT_SPACING);
+        
+        return dist <= effectiveViewRange;
       })
       .map(s => ({
         id: s.id,
