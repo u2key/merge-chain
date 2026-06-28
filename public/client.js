@@ -101,7 +101,12 @@
       resizeCanvas();
 
       // Socket.io で接続（トークンをクエリパラメータで送信）
-      socket = io({query: {token}});
+      // リバースプロキシのサブディレクトリ環境でも動作するように path を自動判定
+      const basePath = new URL('.', window.location.href).pathname;
+      socket = io({
+        path: basePath + 'socket.io',
+        query: {token}
+      });
       attachSocketEvents();
     } catch (e){ console.error('Failed to register:', e); alert('Registration failed'); }
   };
