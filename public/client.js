@@ -31,8 +31,8 @@
   let world = {w:2000, h:2000};
   let playerId = null;
   let gameState = {snakes:[], foods:[]};
-  let mouse = {x: canvas.width/2, y: canvas.height/2};
   let currentScore = 0;
+  let mouse = {x: window.innerWidth/2, y: window.innerHeight/2};
 
   function resizeCanvas(){
     canvas.width = Math.min(window.innerWidth, 1200);
@@ -122,12 +122,18 @@
       gameScreenEl.classList.remove('hidden');
       resizeCanvas();
 
+      if (socket) {
+        socket.disconnect();
+        socket.removeAllListeners();
+      }
+
       // Socket.io で接続（トークンをクエリパラメータで送信）
       // リバースプロキシのサブディレクトリ環境でも動作するように path を自動判定
       const basePath = new URL('.', window.location.href).pathname;
       socket = io({
         path: basePath + 'socket.io',
-        query: {token}
+        query: {token},
+        forceNew: true
       });
       attachSocketEvents();
     } catch (e){ console.error('Failed to register:', e); alert('Registration failed'); }
@@ -163,9 +169,12 @@
     const p = gameState.snakes.find(x => x.id === playerId);
     if (!p || !socket) return;
     
-    // 画面中央（蛇の頭）からマウスへのベクトル
-    const dx = mouse.x - canvas.width / 2;
-    const dy = mouse.y - canvas.height / 2;
+    // 画面中央（蛇の頭）からマウスへのベクトル（物理的な画面サイズベースで計算）
+    const rect = canvas.getBoundingClientRect();
+    const cx = rect.width ? rect.width / 2 : canvas.width / 2;
+    const cy = rect.height ? rect.height / 2 : canvas.height / 2;
+    const dx = mouse.x - cx;
+    const dy = mouse.y - cy;
     const mag = Math.sqrt(dx*dx + dy*dy) || 1;
     
     // カーソルの方向に向かって常に一定速度で進み続けるように、
