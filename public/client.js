@@ -185,6 +185,23 @@
     }).join('');
   }
 
+  // 蛇のベース色と同系色（赤など）の場合、弱点を見やすくするための色を返す
+  function getWeakColor(hex) {
+    if (!hex || hex[0] !== '#') return '#ff4d4d';
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    
+    // デフォルトの弱点色 #ff4d4d (255, 77, 77) との距離を計算
+    const dist = Math.sqrt(Math.pow(r - 255, 2) + Math.pow(g - 77, 2) + Math.pow(b - 77, 2));
+    
+    // 色が近すぎる（赤やオレンジ系）場合は黒っぽい色にする
+    if (dist < 120) {
+      return '#222222';
+    }
+    return '#ff4d4d';
+  }
+
   // Canvas 描画
   function drawGame(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -206,11 +223,12 @@
 
     // スネーク
     for (let s of gameState.snakes){
+      const weakColor = getWeakColor(s.color);
       for (let i=0;i<s.segments.length;i++){
         const seg = s.segments[i];
         const x = seg.x - offsetX, y = seg.y - offsetY;
         const isWeak = (i >= 9) && ((i % 10) === 9 || (i % 10) === 0 || (i % 10) === 1);
-        ctx.beginPath(); ctx.fillStyle = isWeak ? '#ff4d4d' : s.color; ctx.arc(x,y,8,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.fillStyle = isWeak ? weakColor : s.color; ctx.arc(x,y,8,0,Math.PI*2); ctx.fill();
       }
       const sx = s.head.x - offsetX, sy = s.head.y - offsetY;
       ctx.beginPath(); ctx.fillStyle = s.color; ctx.arc(sx, sy, 10, 0, Math.PI*2); ctx.fill();
