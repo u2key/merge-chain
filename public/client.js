@@ -86,15 +86,36 @@
     localStorage.setItem(STORAGE_KEY_SKIN, currentSkin);
 
     try {
-      // サーバーに登録
-      const res = await fetch('./api/player/register', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name, skin: currentSkin})
-      });
-      const {token, player} = await res.json();
-      currentToken = token;
-      localStorage.setItem(STORAGE_KEY_TOKEN, token);
+      let token = currentToken;
+      let isRegistered = false;
+
+      // 既存のトークンがあれば更新を試みる
+      if (token) {
+        const updateRes = await fetch('./api/player/update', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({name, skin: currentSkin})
+        });
+        if (updateRes.ok) {
+          isRegistered = true;
+        }
+      }
+
+      // トークンがない、またはサーバー上で無効化されていた場合は新規登録
+      if (!isRegistered) {
+        const res = await fetch('./api/player/register', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name, skin: currentSkin})
+        });
+        const data = await res.json();
+        token = data.token;
+        currentToken = token;
+        localStorage.setItem(STORAGE_KEY_TOKEN, token);
+      }
 
       // ゲーム画面へ遷移
       lobbyEl.classList.add('hidden');

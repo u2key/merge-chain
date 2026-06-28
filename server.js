@@ -411,8 +411,8 @@ io.on('connection', (socket) => {
     const s = snakes[socket.data.snakeId];
     if (!s) return;
     if (typeof data.x === 'number' && typeof data.y === 'number'){
-      s.target.x = clamp(data.x, 0, WORLD_W);
-      s.target.y = clamp(data.y, 0, WORLD_H);
+      s.target.x = data.x;
+      s.target.y = data.y;
       s.lastSeen = Date.now();
     }
   });
