@@ -43,7 +43,8 @@
   // ロビー画面の初期化
   function initLobby(){
     playerNameInput.value = currentName;
-    skinPickerEl.innerHTML = SKIN_OPTIONS.map((skin, idx) => {
+    skinPickerEl.innerHTML = '';
+    SKIN_OPTIONS.forEach((skin) => {
       const el = document.createElement('div');
       el.className = 'skin-option' + (skin === currentSkin ? ' selected' : '');
       el.style.background = skin;
@@ -123,6 +124,7 @@
       currentScore = gameState.snakes.find(x => x.id === playerId)?.segments.length || 0;
       drawGame();
       updateScoreboard();
+      sendInput();
     });
 
     socket.on('disconnect', () => {
@@ -135,16 +137,31 @@
     });
   }
 
-  // マウス移動で入力をサーバーへ送る
+  // 入力をサーバーへ送る関数
+  function sendInput() {
+    const p = gameState.snakes.find(x => x.id === playerId);
+    if (!p || !socket) return;
+    
+    // 画面中央（蛇の頭）からマウスへのベクトル
+    const dx = mouse.x - canvas.width / 2;
+    const dy = mouse.y - canvas.height / 2;
+    const mag = Math.sqrt(dx*dx + dy*dy) || 1;
+    
+    // カーソルの方向に向かって常に一定速度で進み続けるように、
+    // 現在の頭の位置から十分遠い場所をターゲット座標として送信する
+    const targetDist = 1000;
+    const worldX = p.head.x + (dx / mag) * targetDist;
+    const worldY = p.head.y + (dy / mag) * targetDist;
+    
+    socket.emit('input', { x: worldX, y: worldY });
+  }
+
+  // マウス移動時にも入力を更新
   canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
     mouse.x = e.clientX - rect.left;
     mouse.y = e.clientY - rect.top;
-    const p = gameState.snakes.find(x => x.id === playerId);
-    if (!p || !socket) return;
-    const worldX = p.head.x + (mouse.x - canvas.width/2);
-    const worldY = p.head.y + (mouse.y - canvas.height/2);
-    socket.emit('input', { x: worldX, y: worldY });
+    sendInput();
   });
 
   // ゲーム終了時にスコアを報告
