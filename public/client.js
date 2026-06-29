@@ -232,23 +232,39 @@
     return '#ff4d4d';
   }
 
+  // 座標をカメラ中心からの相対位置に変換（トーラス対応）
+  function getDrawPos(x, y, cx, cy) {
+    let dx = x - cx;
+    let dy = y - cy;
+    
+    // 画面の半分以上の距離がある場合は、反対側から回り込んだほうが近いと判定
+    if (dx > world.w / 2) dx -= world.w;
+    else if (dx < -world.w / 2) dx += world.w;
+    
+    if (dy > world.h / 2) dy -= world.h;
+    else if (dy < -world.h / 2) dy += world.h;
+    
+    return {
+      x: dx + canvas.width / 2,
+      y: dy + canvas.height / 2
+    };
+  }
+
   // Canvas 描画
   function drawGame(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
     const p = gameState.snakes.find(s => s.id === playerId && s.alive);
     const centerX = p ? p.head.x : world.w/2;
     const centerY = p ? p.head.y : world.h/2;
-    const offsetX = centerX - canvas.width/2;
-    const offsetY = centerY - canvas.height/2;
 
     ctx.fillStyle = '#080a0b';
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
     // エサ
     for (let f of gameState.foods){
-      const x = f.x - offsetX, y = f.y - offsetY;
-      if (x < -20 || x > canvas.width+20 || y < -20 || y > canvas.height+20) continue;
-      ctx.beginPath(); ctx.fillStyle = '#ffd700'; ctx.arc(x,y,f.r,0,Math.PI*2); ctx.fill();
+      const pos = getDrawPos(f.x, f.y, centerX, centerY);
+      if (pos.x < -20 || pos.x > canvas.width+20 || pos.y < -20 || pos.y > canvas.height+20) continue;
+      ctx.beginPath(); ctx.fillStyle = '#ffd700'; ctx.arc(pos.x, pos.y, f.r, 0, Math.PI*2); ctx.fill();
     }
 
     // スネーク
@@ -256,13 +272,13 @@
       const weakColor = getWeakColor(s.color);
       for (let i=0;i<s.segments.length;i++){
         const seg = s.segments[i];
-        const x = seg.x - offsetX, y = seg.y - offsetY;
+        const pos = getDrawPos(seg.x, seg.y, centerX, centerY);
         const isWeak = (i >= 9) && ((i % 10) === 9 || (i % 10) === 0 || (i % 10) === 1);
-        ctx.beginPath(); ctx.fillStyle = isWeak ? weakColor : s.color; ctx.arc(x,y,8,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.fillStyle = isWeak ? weakColor : s.color; ctx.arc(pos.x, pos.y, 8, 0, Math.PI*2); ctx.fill();
       }
-      const sx = s.head.x - offsetX, sy = s.head.y - offsetY;
-      ctx.beginPath(); ctx.fillStyle = s.color; ctx.arc(sx, sy, 10, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.font = '12px sans-serif'; ctx.fillText(s.name, sx + 12, sy - 12);
+      const headPos = getDrawPos(s.head.x, s.head.y, centerX, centerY);
+      ctx.beginPath(); ctx.fillStyle = s.color; ctx.arc(headPos.x, headPos.y, 10, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = '12px sans-serif'; ctx.fillText(s.name, headPos.x + 12, headPos.y - 12);
     }
   }
 

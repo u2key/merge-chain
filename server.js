@@ -62,7 +62,13 @@ let nextFoodId = 1;
 let nextSnakeId = 1;
 
 function randRange(a,b){ return Math.random()*(b-a)+a; }
-function dist(a,b){ const dx=a.x-b.x; const dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); }
+function dist(a,b){
+  let dx = Math.abs(a.x - b.x);
+  if (dx > WORLD_W / 2) dx = WORLD_W - dx;
+  let dy = Math.abs(a.y - b.y);
+  if (dy > WORLD_H / 2) dy = WORLD_H - dy;
+  return Math.sqrt(dx*dx + dy*dy);
+}
 function clamp(v,min,max){ return Math.max(min,Math.min(max,v)); }
 
 function createSnake({id,type='npc',name,color,x,y,len=INITIAL_SEGMENTS}){
@@ -208,12 +214,24 @@ function tick(){
     let prevX = s.head.x; let prevY = s.head.y;
     for (let i=0;i<s.segments.length;i++){
       const seg = s.segments[i];
-      const dxs = prevX - seg.x; const dys = prevY - seg.y;
+      let dxs = prevX - seg.x; 
+      let dys = prevY - seg.y;
+      
+      if (dxs > WORLD_W / 2) dxs -= WORLD_W;
+      else if (dxs < -WORLD_W / 2) dxs += WORLD_W;
+      if (dys > WORLD_H / 2) dys -= WORLD_H;
+      else if (dys < -WORLD_H / 2) dys += WORLD_H;
+
       const d = Math.sqrt(dxs*dxs + dys*dys) || 1;
       if (d > SEGMENT_SPACING){
         const ang = Math.atan2(dys, dxs);
         seg.x = prevX - Math.cos(ang) * SEGMENT_SPACING;
         seg.y = prevY - Math.sin(ang) * SEGMENT_SPACING;
+        
+        if (seg.x < 0) seg.x += WORLD_W;
+        else if (seg.x >= WORLD_W) seg.x -= WORLD_W;
+        if (seg.y < 0) seg.y += WORLD_H;
+        else if (seg.y >= WORLD_H) seg.y -= WORLD_H;
       }
       prevX = seg.x; prevY = seg.y;
     }
@@ -303,15 +321,13 @@ function tick(){
         // プレイヤー自身は必ず表示
         if (s.id === playerSnake.id) return true;
         
-        const dx = s.head.x - playerSnake.head.x;
-        const dy = s.head.y - playerSnake.head.y;
-        const dist = Math.sqrt(dx*dx + dy*dy);
+        const d = dist(s.head, playerSnake.head);
         
         // スネークの胴体の長さを考慮した有効な視野範囲
         // 頭が遠くても、胴体が長い場合は画面内に収まる可能性があるため
         const effectiveViewRange = VIEW_RANGE + (s.segments.length * SEGMENT_SPACING);
         
-        return dist <= effectiveViewRange;
+        return d <= effectiveViewRange;
       })
       .map(s => ({
         id: s.id,
@@ -325,10 +341,7 @@ function tick(){
     
     // プレイヤー周囲のエサをフィルタリング
     const visibleFoods = foods.filter(f => {
-      const dx = f.x - playerSnake.head.x;
-      const dy = f.y - playerSnake.head.y;
-      const distSq = dx*dx + dy*dy;
-      return distSq <= VIEW_RANGE * VIEW_RANGE;
+      return dist(f, playerSnake.head) <= VIEW_RANGE;
     }).map(f => ({id: f.id, x: f.x, y: f.y, r: f.r}));
     
     // プレイヤー固有の state を送信
