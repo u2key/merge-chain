@@ -147,6 +147,11 @@ setInterval(tick, TICK_MS);
 function killSnakeAndScatter(snake){
   spawnFoodFromSnake(snake);
   if (snake.type === 'player'){
+    // 保存（スコア更新）
+    if (snake.token && playersDB[snake.token]) {
+      playersDB[snake.token].maxScore = Math.max(playersDB[snake.token].maxScore, snake.segments.length);
+      savePlayers();
+    }
     // プレイヤーはリスポーン扱いにして、すぐに削除しない
     snake.alive = false;
     snake.segments = [];
@@ -275,6 +280,14 @@ function tick(){
   if (foods.length < 40) spawnFood(30);
   if (foods.length > MAX_FOOD) foods = foods.slice(0, MAX_FOOD);
 
+  // リアルタイムの最高スコア更新（メモリ上のみ、ディスク書き込みは負荷軽減のため死亡・切断時のみ）
+  for (const id in snakes) {
+    const s = snakes[id];
+    if (s && s.alive && s.type === 'player' && s.token && playersDB[s.token]) {
+      playersDB[s.token].maxScore = Math.max(playersDB[s.token].maxScore, s.segments.length);
+    }
+  }
+
   // マルチプレイ同期: 各プレイヤーに対して周囲オブジェクトのみを送信
   // （ネットワーク最適化: 視野範囲外のスネーク・エサは送信しない）
   // 視野範囲: プレイヤー周囲 800px（画面幅相当 + マージン）
@@ -400,8 +413,9 @@ io.on('connection', (socket) => {
     y: randRange(200, WORLD_H-200),
     len: 18
   });
-  // socketId をスネークに紐付け（tick() で周囲フィルタリング時に使用）
+  // socketId と token をスネークに紐付け（tick() や死亡時のスコア保存に使用）
   snakes[pid].socketId = socket.id;
+  snakes[pid].token = token;
   socket.data.snakeId = pid;
   socket.data.token = token;
   socket.emit('init', { id: pid, world: {w: WORLD_W, h: WORLD_H}, player: player });
@@ -428,10 +442,18 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    const sid = socket.data.snakeId;
-    const s = snakes[sid];
-    if (s){ spawnFoodFromSnake(s); delete snakes[sid]; }
     console.log('client disconnected:', socket.id);
+    const s = snakes[socket.data.snakeId];
+    if (s){
+      // 接続切れ時にもスコアを保存
+      const token = socket.data.token;
+      if (token && playersDB[token]){
+         playersDB[token].maxScore = Math.max(playersDB[token].maxScore, s.segments.length);
+         savePlayers();
+      }
+      spawnFoodFromSnake(s);
+      delete snakes[socket.data.snakeId];
+    }
   });
 });
 
