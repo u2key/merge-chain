@@ -72,6 +72,53 @@ function dist(a,b){
 }
 function clamp(v,min,max){ return Math.max(min,Math.min(max,v)); }
 
+// 他のスネークと重ならない安全なスポーン地点を探索する
+function findSafeSpawnPoint(len = 24) {
+  const minDistance = 80; // 他のスネークの胴体・頭から離れるべき最低距離(px)
+  let attempts = 0;
+  while (attempts < 100) {
+    const x = randRange(300, WORLD_W - 300);
+    const y = randRange(300, WORLD_H - 300);
+    
+    // スポーン時に配置される予定の全パーツの座標リストを作成
+    const newParts = [{x, y}];
+    for (let i = 0; i < len; i++) {
+      newParts.push({ x: x - (i+1) * SEGMENT_SPACING, y });
+    }
+    
+    let safe = true;
+    for (const id in snakes) {
+      const s = snakes[id];
+      if (!s || !s.alive) continue;
+      
+      for (const newPart of newParts) {
+        if (dist(newPart, s.head) < minDistance) {
+          safe = false;
+          break;
+        }
+        for (const seg of s.segments) {
+          if (dist(newPart, seg) < minDistance) {
+            safe = false;
+            break;
+          }
+        }
+        if (!safe) break;
+      }
+      if (!safe) break;
+    }
+    
+    if (safe) {
+      return { x, y };
+    }
+    attempts++;
+  }
+  // 見つからなかった場合の安全なフォールバック
+  return {
+    x: randRange(200, WORLD_W - 200),
+    y: randRange(200, WORLD_H - 200)
+  };
+}
+
 function createSnake({id,type='npc',name,color,x,y,len=INITIAL_SEGMENTS}){
   const snake = {
     id,
@@ -106,14 +153,16 @@ function spawnFood(n) {
 
 function spawnNPC(){
   const id = 'npc' + (nextSnakeId++);
+  const len = Math.floor(INITIAL_SEGMENTS * randRange(0.6,1.2));
+  const pos = findSafeSpawnPoint(len);
   createSnake({
     id,
     type: 'npc',
     name: 'NPC ' + id,
     color: randomColor(),
-    x: randRange(100, WORLD_W-100),
-    y: randRange(100, WORLD_H-100),
-    len: Math.floor(INITIAL_SEGMENTS * randRange(0.6,1.2))
+    x: pos.x,
+    y: pos.y,
+    len: len
   });
 }
 
@@ -291,6 +340,9 @@ function tick(){
     if (!s) continue;
     if (!s.alive && s.respawnAt && now >= s.respawnAt){
       s.alive = true; s.respawnAt = null; s.segments = [];
+      const pos = findSafeSpawnPoint(8);
+      s.head.x = pos.x;
+      s.head.y = pos.y;
       for (let i=0;i<8;i++) s.segments.push({x: s.head.x - (i+1)*SEGMENT_SPACING, y: s.head.y});
     }
   }
@@ -418,13 +470,14 @@ io.on('connection', (socket) => {
   const pid = 'player' + (nextSnakeId++);
   const playerName = player?.name || 'Player ' + pid;
   const playerSkin = player?.skin || randomColor();
+  const pos = findSafeSpawnPoint(18);
   createSnake({
     id: pid,
     type: 'player',
     name: playerName,
     color: playerSkin,
-    x: randRange(200, WORLD_W-200),
-    y: randRange(200, WORLD_H-200),
+    x: pos.x,
+    y: pos.y,
     len: 18
   });
   // socketId と token をスネークに紐付け（tick() や死亡時のスコア保存に使用）
