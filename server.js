@@ -55,6 +55,7 @@ const MAX_FOOD = 200;
 const FOOD_RADIUS = 6;
 const SEGMENT_RADIUS = 8;
 const EAT_DISTANCE = SEGMENT_RADIUS + FOOD_RADIUS;
+const WEAK_INTERVAL = 10; // 弱点の間隔（千切れるポイントの周期）
 
 let snakes = {}; // id -> snake
 let foods = [];
@@ -138,13 +139,13 @@ spawnFood(START_FOOD);
 for (let i=0;i<MIN_NPCS;i++) spawnNPC();
 
 // 千切れる判定（最重要）
-// 仕様: インデックスが 9,10,11 / 19,20,21 / 29,30,31 ... のように、
-// "10の倍数、その前後1つ" に該当する箇所が弱点となる
-// 「インデックスは0始まり」のため、最初の弱点は index >= 9 から始める
+// 仕様: インデックスが (WEAK_INTERVAL - 1), WEAK_INTERVAL, (WEAK_INTERVAL + 1) のように、
+// WEAK_INTERVAL の倍数、その前後1つに該当する箇所が弱点となる
+// 「インデックスは0始まり」のため、最初の弱点は index >= (WEAK_INTERVAL - 1) から始める
 function isWeakIndex(idx){
-  if (idx < 9) return false;
-  const m = idx % 10;
-  return (m === 9 || m === 0 || m === 1);
+  if (idx < WEAK_INTERVAL - 1) return false;
+  const m = idx % WEAK_INTERVAL;
+  return (m === WEAK_INTERVAL - 1 || m === 0 || m === 1);
 }
 
 // メインループ
@@ -431,7 +432,12 @@ io.on('connection', (socket) => {
   snakes[pid].token = token;
   socket.data.snakeId = pid;
   socket.data.token = token;
-  socket.emit('init', { id: pid, world: {w: WORLD_W, h: WORLD_H}, player: player });
+  socket.emit('init', {
+    id: pid,
+    world: {w: WORLD_W, h: WORLD_H},
+    player: player,
+    weakInterval: WEAK_INTERVAL
+  });
 
   // クライアントからの入力（ワールド座標）を受け取り、サーバー側で移動ターゲットとして利用する
   socket.on('input', (data) => {

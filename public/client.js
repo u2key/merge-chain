@@ -33,6 +33,7 @@
   let gameState = {snakes:[], foods:[]};
   let currentScore = 0;
   let mouse = {x: window.innerWidth/2, y: window.innerHeight/2};
+  let weakInterval = 10;
 
   function resizeCanvas(){
     canvas.width = Math.min(window.innerWidth, 1200);
@@ -143,6 +144,7 @@
     socket.on('init', (data) => {
       playerId = data.id;
       world = data.world;
+      weakInterval = data.weakInterval || 10;
       console.log('Game initialized:', data);
     });
 
@@ -273,7 +275,7 @@
       for (let i=0;i<s.segments.length;i++){
         const seg = s.segments[i];
         const pos = getDrawPos(seg.x, seg.y, centerX, centerY);
-        const isWeak = (i >= 9) && ((i % 10) === 9 || (i % 10) === 0 || (i % 10) === 1);
+        const isWeak = (i >= weakInterval - 1) && ((i % weakInterval) === weakInterval - 1 || (i % weakInterval) === 0 || (i % weakInterval) === 1);
         ctx.beginPath(); ctx.fillStyle = isWeak ? weakColor : s.color; ctx.arc(pos.x, pos.y, 8, 0, Math.PI*2); ctx.fill();
       }
       const headPos = getDrawPos(s.head.x, s.head.y, centerX, centerY);
