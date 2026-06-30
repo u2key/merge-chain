@@ -258,6 +258,9 @@ function tick(){
   for (let s of snakeList){
     if (!s || !s.alive) continue;
     
+    // 高速移動時の衝突すり抜け防止（トンネリング対策）のために移動前の頭の位置を保存
+    s.oldHead = { x: s.head.x, y: s.head.y };
+    
     // 長さに応じた速度減衰を計算
     const lengthPenalty = Math.max(SPEED_MIN_RATIO, 1.0 - s.segments.length * SPEED_DECAY_RATE);
     let currentSpeed = s.speed * lengthPenalty;
@@ -340,7 +343,33 @@ function tick(){
       if (attacker.id === target.id) continue;
       for (let segIdx = 0; segIdx < target.segments.length; segIdx++){
         const seg = target.segments[segIdx];
-        if (dist(attacker.head, seg) <= SEGMENT_RADIUS * 1.0){
+        
+        // 現在位置と移動中間地点（サブステップ）の両方で判定を行い、高速時のすり抜けを防ぐ
+        const dCurrent = dist(attacker.head, seg);
+        let dMid = Infinity;
+        if (attacker.oldHead) {
+          let ox = attacker.oldHead.x;
+          let oy = attacker.oldHead.y;
+          let nx = attacker.head.x;
+          let ny = attacker.head.y;
+          
+          // 世界の端をまたいだ（ワープ）場合の補正
+          if (nx - ox > WORLD_W / 2) ox += WORLD_W;
+          else if (ox - nx > WORLD_W / 2) ox -= WORLD_W;
+          if (ny - oy > WORLD_H / 2) oy += WORLD_H;
+          else if (oy - ny > WORLD_H / 2) oy -= WORLD_H;
+          
+          let mx = (ox + nx) / 2;
+          let my = (oy + ny) / 2;
+          if (mx < 0) mx += WORLD_W; else if (mx >= WORLD_W) mx -= WORLD_W;
+          if (my < 0) my += WORLD_H; else if (my >= WORLD_H) my -= WORLD_H;
+          
+          dMid = dist({ x: mx, y: my }, seg);
+        }
+        
+        // 判定距離を SEGMENT_RADIUS(8) + HEAD_RADIUS(10) に合わせて 15px に緩和
+        const collisionThreshold = 15;
+        if (dCurrent <= collisionThreshold || dMid <= collisionThreshold){
           if (isWeakIndex(segIdx)){
             // 分岐A: 千切れるポイント（弱点）
             // 衝突された側の胴体を segIdx から末尾まで切り離す
