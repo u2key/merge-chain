@@ -45,7 +45,7 @@ loadPlayers();
 const WORLD_W = 2000;
 const WORLD_H = 2000;
 const TICK_MS = 50; // サーバー更新間隔（ms）
-const PLAYER_SPEED = 160; // px/sec
+const PLAYER_SPEED = 160; // px/sec（基本速度）
 const NPC_SPEED = 120;
 const SEGMENT_SPACING = 10;
 const INITIAL_SEGMENTS = 24;
@@ -55,7 +55,15 @@ const MAX_FOOD = 200;
 const FOOD_RADIUS = 6;
 const SEGMENT_RADIUS = 8;
 const EAT_DISTANCE = SEGMENT_RADIUS + FOOD_RADIUS;
-const WEAK_INTERVAL = 10; // 弱点の間隔（千切れるポイントの周期）
+const WEAK_INTERVAL = 33; // 弱点の間隔（千切れるポイントの周期）
+
+// 速度スケーリングパラメータ
+const SPEED_MIN_RATIO = 0.7;  // 最低速度倍率（最長時でも基本速度の70%）
+const SPEED_DECAY_RATE = 0.01; // セグメント1個あたりの速度減衰率
+const BOOST_MULTIPLIER = 5.0;  // ブースト時の速度倍率
+const BOOST_COST_PER_TICK = 1; // ブースト中に1tickあたり失うセグメント数（3tick=約150msに1個）
+const BOOST_COST_INTERVAL = 3; // 何tickごとにセグメントを消費するか
+const BOOST_MIN_SEGMENTS = 5;  // ブーストに必要な最低セグメント数
 
 let snakes = {}; // id -> snake
 let foods = [];
@@ -249,10 +257,31 @@ function tick(){
   // 移動更新
   for (let s of snakeList){
     if (!s || !s.alive) continue;
+    
+    // 長さに応じた速度減衰を計算
+    const lengthPenalty = Math.max(SPEED_MIN_RATIO, 1.0 - s.segments.length * SPEED_DECAY_RATE);
+    let currentSpeed = s.speed * lengthPenalty;
+    
+    // ブースト処理
+    if (s.boosting && s.segments.length >= BOOST_MIN_SEGMENTS) {
+      currentSpeed *= BOOST_MULTIPLIER;
+      // ブーストのコスト: 一定tick間隔でセグメントを1個消費してエサに変換
+      s.boostTick = (s.boostTick || 0) + 1;
+      if (s.boostTick >= BOOST_COST_INTERVAL) {
+        s.boostTick = 0;
+        for (let bc = 0; bc < BOOST_COST_PER_TICK && s.segments.length > BOOST_MIN_SEGMENTS; bc++) {
+          const tail = s.segments.pop();
+          foods.push({ id: nextFoodId++, x: tail.x, y: tail.y, r: FOOD_RADIUS });
+        }
+      }
+    } else {
+      s.boosting = false; // セグメント不足で強制解除
+    }
+    
     const dx = s.target.x - s.head.x;
     const dy = s.target.y - s.head.y;
     const mag = Math.sqrt(dx*dx + dy*dy) || 1;
-    const moveDist = s.speed * (TICK_MS / 1000);
+    const moveDist = currentSpeed * (TICK_MS / 1000);
     s.head.x += (dx / mag) * Math.min(moveDist, mag);
     s.head.y += (dy / mag) * Math.min(moveDist, mag);
     // ラップ処理
@@ -501,6 +530,43 @@ io.on('connection', (socket) => {
       s.target.y = data.y;
       s.lastSeen = Date.now();
     }
+  });
+
+  // ブースト（左クリック）の開始・終了
+  socket.on('boost', (data) => {
+    const s = snakes[socket.data.snakeId];
+    if (!s || !s.alive) return;
+    s.boosting = !!data.active;
+    if (s.boosting) s.boostTick = 0;
+  });
+
+  // 吐き出し（右クリック）: 体の後半分をエサとして前方に放出
+  socket.on('spit', () => {
+    const s = snakes[socket.data.snakeId];
+    if (!s || !s.alive || s.segments.length < 4) return;
+    
+    // 現在の進行方向を算出
+    const dx = s.target.x - s.head.x;
+    const dy = s.target.y - s.head.y;
+    const mag = Math.sqrt(dx*dx + dy*dy) || 1;
+    const dirX = dx / mag;
+    const dirY = dy / mag;
+    
+    // 後半分を切り離す
+    const halfIdx = Math.floor(s.segments.length / 2);
+    const ejected = s.segments.splice(halfIdx);
+    
+    // 前方にエサとして散布（頭の前方にばらまく）
+    ejected.forEach((seg, i) => {
+      const spreadDist = 30 + i * 12;
+      const angle = Math.atan2(dirY, dirX) + (Math.random() - 0.5) * 0.6;
+      let fx = s.head.x + Math.cos(angle) * spreadDist;
+      let fy = s.head.y + Math.sin(angle) * spreadDist;
+      // ワールドラップ
+      if (fx < 0) fx += WORLD_W; else if (fx >= WORLD_W) fx -= WORLD_W;
+      if (fy < 0) fy += WORLD_H; else if (fy >= WORLD_H) fy -= WORLD_H;
+      foods.push({ id: nextFoodId++, x: fx, y: fy, r: FOOD_RADIUS });
+    });
   });
 
   // ゲーム終了時にスコアを報告（スコア = 蛇の体長）

@@ -196,6 +196,26 @@
     sendInput();
   });
 
+  // 左クリック: ブースト（加速）
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 0 && socket) {
+      socket.emit('boost', { active: true });
+    }
+  });
+  canvas.addEventListener('mouseup', (e) => {
+    if (e.button === 0 && socket) {
+      socket.emit('boost', { active: false });
+    }
+  });
+
+  // 右クリック: 体半分を前方にエサとして吐き出す
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (socket) {
+      socket.emit('spit');
+    }
+  });
+
   // ゲーム終了時にスコアを報告
   function reportScore(){
     if (socket && currentScore > 0){
